@@ -165,6 +165,37 @@
     .stream-info h1 { font-size: 1.05rem; font-weight: 600; }
     .stream-info p  { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
 
+    .playback-meta {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: #0f141b;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      letter-spacing: 0.3px;
+    }
+
+    .chip.live {
+      color: #fff;
+      background: #b62323;
+      border-color: #d83939;
+      font-weight: 700;
+    }
+
+    .chip.delay {
+      color: #ffd58a;
+      border-color: #70541f;
+      background: #251d0f;
+    }
+
     /* ── Chat-Sidebar ──────────────────────────────────────────────────── */
     .chat-col {
       width: 320px;
@@ -332,6 +363,10 @@
       <div class="stream-info">
         <h1 id="stream-title">TTH Live Stream</h1>
         <p id="stream-sub">Warte auf Stream…</p>
+        <div class="playback-meta">
+          <span id="live-state-chip" class="chip">OFFLINE</span>
+          <span id="stream-uptime-chip" class="chip">Laufzeit: 00:00</span>
+        </div>
       </div>
     </div>
 
@@ -367,6 +402,8 @@ const video          = document.getElementById('stream');
 const offlineOverlay = document.getElementById('offline-overlay');
 const liveBadge      = document.getElementById('live-badge');
 const streamSub      = document.getElementById('stream-sub');
+const liveStateChip  = document.getElementById('live-state-chip');
+const streamUptimeChip = document.getElementById('stream-uptime-chip');
 
 // Stream-Key hier für den HLS-Pfad eintragen (muss mit nginx.conf übereinstimmen)
 const STREAM_KEY = '74243974c3c38a6b0d75d7b3f43778c4';
@@ -374,6 +411,67 @@ const HLS_URL    = `/hls/${STREAM_KEY}.m3u8`;
 
 let hls;
 let pollTimer;
+let healthTimer;
+let uiTimer;
+let streamStartMs = null;
+let isOnline = false;
+
+function fmtDuration(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function updatePlaybackUi() {
+  if (!isOnline) {
+    liveStateChip.textContent = 'OFFLINE';
+    liveStateChip.className = 'chip';
+    streamUptimeChip.textContent = 'Laufzeit: 00:00';
+    return;
+  }
+
+  const now = Date.now();
+  const upSeconds = streamStartMs ? (now - streamStartMs) / 1000 : 0;
+  streamUptimeChip.textContent = `Laufzeit: ${fmtDuration(upSeconds)}`;
+
+  let delay = 0;
+  if (hls && Number.isFinite(hls.liveSyncPosition) && Number.isFinite(video.currentTime)) {
+    delay = Math.max(0, hls.liveSyncPosition - video.currentTime);
+  }
+
+  if (delay <= 2) {
+    liveStateChip.textContent = 'LIVE';
+    liveStateChip.className = 'chip live';
+  } else {
+    liveStateChip.textContent = `-${fmtDuration(delay)}`;
+    liveStateChip.className = 'chip delay';
+  }
+}
+
+async function pingManifest() {
+  try {
+    const res = await fetch(`${HLS_URL}?_t=${Date.now()}`, { cache: 'no-store' });
+    return res.ok;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function startHealthCheck() {
+  clearInterval(healthTimer);
+  healthTimer = setInterval(async () => {
+    const ok = await pingManifest();
+    if (!ok) {
+      setOnline(false);
+      scheduleRetry();
+    }
+  }, 4000);
+}
 
 function startPlayer() {
   if (hls) { hls.destroy(); }
@@ -390,6 +488,7 @@ function startPlayer() {
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       video.play().catch(() => {});
       setOnline(true);
+      startHealthCheck();
     });
 
     hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -405,20 +504,48 @@ function startPlayer() {
     video.addEventListener('loadedmetadata', () => {
       video.play().catch(() => {});
       setOnline(true);
+      startHealthCheck();
     });
   }
 }
 
 function setOnline(online) {
+  if (online && !isOnline && !streamStartMs) {
+    streamStartMs = Date.now();
+  }
+  if (!online) {
+    streamStartMs = null;
+  }
+  isOnline = online;
   offlineOverlay.style.display = online ? 'none' : 'flex';
   liveBadge.classList.toggle('visible', online);
   streamSub.textContent = online ? '🟢 Stream läuft' : 'Warte auf Stream…';
+  if (!online) {
+    clearInterval(healthTimer);
+  }
+  updatePlaybackUi();
 }
 
 function scheduleRetry() {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(startPlayer, 5000); // alle 5 s neu versuchen
 }
+
+video.addEventListener('seeking', updatePlaybackUi);
+video.addEventListener('seeked', updatePlaybackUi);
+video.addEventListener('timeupdate', updatePlaybackUi);
+video.addEventListener('stalled', () => {
+  // Bei längeren Abrissen sofort auf offline schalten und neu verbinden.
+  setOnline(false);
+  scheduleRetry();
+});
+video.addEventListener('ended', () => {
+  setOnline(false);
+  scheduleRetry();
+});
+
+clearInterval(uiTimer);
+uiTimer = setInterval(updatePlaybackUi, 1000);
 
 startPlayer();
 
