@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TTH Stream</title>
+
+  <!-- hls.js für HLS-Wiedergabe im Browser -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+  <!-- Socket.io Client (wird dynamisch nach Port 4021 aufgelöst) -->
+  <script>
+    // Codespace-Domain: potential-acorn-xxx-4020.app.github.dev → potential-acorn-xxx-4021.app.github.dev
+    // Lokal: localhost:4020 → localhost:4021
+    const _chatBase = (() => {
+      const h = window.location.hostname;
+      // GitHub Codespaces: Port ist im Hostname kodiert
+      if (h.includes('.app.github.dev')) {
+        return 'https://' + h.replace(/-4020\./, '-4021.');
+      }
+      return 'http://' + window.location.hostname + ':4021';
+    })();
+  </script>
+  <script id="sio-script"></script>
+  <script>
+    document.getElementById('sio-script').src = _chatBase + '/socket.io/socket.io.js';
+  </script>
+
+  <style>
+    /* ── Reset & Basis ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f11;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent2:   #3fb950;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --danger:    #f85149;
+      --chat-bg:   #0d1117;
+      --msg-bg:    #1c2128;
+      --radius:    8px;
+      --font:      'Segoe UI', system-ui, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+
+    #live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    #live-badge.visible { opacity: 1; }
+
+    #live-badge::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .3; }
+    }
+
+    #viewer-count {
+      margin-left: auto;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* ── Haupt-Inhalt ──────────────────────────────────────────────────── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Video-Bereich ─────────────────────────────────────────────────── */
+    .player-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #player-wrap {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 */
+      background: #000;
+    }
+
+    video#stream {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #offline-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #000;
+      color: var(--muted);
+    }
+
+    #offline-overlay svg { width: 64px; height: 64px; opacity: .3; }
+
+    .stream-info {
+      padding: 16px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .stream-info h1 { font-size: 1.05rem; font-weight: 600; }
+    .stream-info p  { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Chat-Sidebar ──────────────────────────────────────────────────── */
+    .chat-col {
+      width: 320px;
+      min-width: 240px;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      background: var(--chat-bg);
+      border-left: 1px solid var(--border);
+    }
+
+    .chat-header {
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .msg {
+      background: var(--msg-bg);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+
+    .msg .nick {
+      font-weight: 700;
+      color: var(--accent);
+      margin-right: 6px;
+    }
+
+    .msg .time {
+      font-size: 0.72rem;
+      color: var(--muted);
+      float: right;
+      margin-left: 8px;
+      margin-top: 2px;
+    }
+
+    .sys-msg {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 3px 0;
+    }
+
+    /* ── Nick-Setup ────────────────────────────────────────────────────── */
+    #nick-form {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    #nick-form input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    #nick-form input:focus { border-color: var(--accent); }
+
+    /* ── Chat-Eingabe ──────────────────────────────────────────────────── */
+    #chat-form {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: none;
+      gap: 8px;
+    }
+
+    #chat-form.active { display: flex; }
+
+    #chat-form input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    #chat-form input:focus { border-color: var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #0d0f11;
+      font-weight: 700;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+
+    button:hover { opacity: .85; }
+
+    #error-banner {
+      margin: 6px 12px;
+      padding: 6px 10px;
+      background: rgba(248, 81, 73, .15);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      color: var(--danger);
+      display: none;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .main { flex-direction: column; }
+      .chat-col { width: 100%; border-left: none; border-top: 1px solid var(--border); height: 40vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ── Kopfzeile ─────────────────────────────────────────────────────── -->
+  <header>
+    <span class="logo">⬡ TTH Stream</span>
+    <span id="live-badge">LIVE</span>
+    <span id="viewer-count">0 Zuschauer</span>
+  </header>
+
+  <!-- ── Haupt-Layout ─────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- ── Player ──────────────────────────────────────────────────────── -->
+    <div class="player-col">
+      <div id="player-wrap">
+        <video id="stream" controls playsinline autoplay muted></video>
+        <div id="offline-overlay">
+          <!-- Kamera-Icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+          </svg>
+          <p>Stream ist gerade offline</p>
+        </div>
+      </div>
+      <div class="stream-info">
+        <h1 id="stream-title">TTH Live Stream</h1>
+        <p id="stream-sub">Warte auf Stream…</p>
+      </div>
+    </div>
+
+    <!-- ── Chat ────────────────────────────────────────────────────────── -->
+    <div class="chat-col">
+      <div class="chat-header">Live-Chat</div>
+
+      <div id="chat-messages"></div>
+
+      <div id="error-banner"></div>
+
+      <!-- Nickname-Eingabe (zuerst sichtbar) -->
+      <form id="nick-form">
+        <input id="nick-input" type="text" placeholder="Dein Nickname…" maxlength="24" autocomplete="off" required />
+        <button type="submit">Beitreten</button>
+      </form>
+
+      <!-- Chat-Eingabe (nach Nick sichtbar) -->
+      <form id="chat-form">
+        <input id="msg-input" type="text" placeholder="Nachricht schreiben…" maxlength="300" autocomplete="off" />
+        <button type="submit">➤</button>
+      </form>
+    </div>
+
+  </div><!-- /.main -->
+</div><!-- /.wrapper -->
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   HLS PLAYER
+════════════════════════════════════════════════════════════════════════════ */
+const video          = document.getElementById('stream');
+const offlineOverlay = document.getElementById('offline-overlay');
+const liveBadge      = document.getElementById('live-badge');
+const streamSub      = document.getElementById('stream-sub');
+
+// Stream-Key hier für den HLS-Pfad eintragen (muss mit nginx.conf übereinstimmen)
+const STREAM_KEY = '74243974c3c38a6b0d75d7b3f43778c4';
+const HLS_URL    = `/hls/${STREAM_KEY}.m3u8`;
+
+let hls;
+let pollTimer;
+
+function startPlayer() {
+  if (hls) { hls.destroy(); }
+
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 6,
+      enableWorker: true,
+    });
+    hls.loadSource(HLS_URL);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(() => {});
+      setOnline(true);
+    });
+
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (data.fatal) {
+        setOnline(false);
+        scheduleRetry();
+      }
+    });
+
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari Native HLS
+    video.src = HLS_URL;
+    video.addEventListener('loadedmetadata', () => {
+      video.play().catch(() => {});
+      setOnline(true);
+    });
+  }
+}
+
+function setOnline(online) {
+  offlineOverlay.style.display = online ? 'none' : 'flex';
+  liveBadge.classList.toggle('visible', online);
+  streamSub.textContent = online ? '🟢 Stream läuft' : 'Warte auf Stream…';
+}
+
+function scheduleRetry() {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(startPlayer, 5000); // alle 5 s neu versuchen
+}
+
+startPlayer();
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CHAT (Socket.io)
+════════════════════════════════════════════════════════════════════════════ */
+const socket        = io(_chatBase);
+const messagesDiv   = document.getElementById('chat-messages');
+const nickForm      = document.getElementById('nick-form');
+const nickInput     = document.getElementById('nick-input');
+const chatForm      = document.getElementById('chat-form');
+const msgInput      = document.getElementById('msg-input');
+const errorBanner   = document.getElementById('error-banner');
+const viewerCount   = document.getElementById('viewer-count');
+
+let myNick = null;
+
+function showError(msg) {
+  errorBanner.textContent = msg;
+  errorBanner.style.display = 'block';
+  setTimeout(() => { errorBanner.style.display = 'none'; }, 3000);
+}
+
+function appendMsg({ nick, msg, ts }) {
+  const d   = document.createElement('div');
+  d.className = 'msg';
+  const time = new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  d.innerHTML = `<span class="time">${time}</span><span class="nick">${escHtml(nick)}</span>${escHtml(msg)}`;
+  messagesDiv.appendChild(d);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function appendSys(msg) {
+  const d = document.createElement('div');
+  d.className = 'sys-msg';
+  d.textContent = msg;
+  messagesDiv.appendChild(d);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function escHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Socket-Events ────────────────────────────────────────────────────────
+socket.on('nick_ok', (nick) => {
+  myNick = nick;
+  nickForm.style.display  = 'none';
+  chatForm.classList.add('active');
+  msgInput.focus();
+});
+
+socket.on('chat_msg',   appendMsg);
+socket.on('system_msg', appendSys);
+
+socket.on('error_msg', showError);
+
+socket.on('user_count', (n) => {
+  viewerCount.textContent = `${n} Zuschauer`;
+});
+
+// ── Formulare ────────────────────────────────────────────────────────────
+nickForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const nick = nickInput.value.trim();
+  if (nick) socket.emit('set_nick', nick);
+});
+
+chatForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const msg = msgInput.value.trim();
+  if (msg) {
+    socket.emit('chat_msg', msg);
+    msgInput.value = '';
+  }
+});
+</script>
+
+</body>
+</html>

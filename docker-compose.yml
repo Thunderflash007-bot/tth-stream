@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+
+  # ── Nginx + RTMP ──────────────────────────────────────────────────────────
+  nginx-rtmp:
+    image: tiangolo/nginx-rtmp
+    container_name: tth-nginx
+    restart: unless-stopped
+    ports:
+      - "4020:4020"   # Web-Frontend
+      - "4022:4022"   # RTMP-Eingang (OBS)
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./html:/var/www/html:ro
+      - hls_data:/var/www/hls
+
+  # ── Chat-Server ───────────────────────────────────────────────────────────
+  chat:
+    image: node:20-alpine
+    container_name: tth-chat
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install --omit=dev && node server.js"
+    ports:
+      - "4021:4021"   # Socket.io Chat
+    volumes:
+      - ./chat:/app
+      - chat_modules:/app/node_modules
+
+volumes:
+  hls_data:
+  chat_modules:
