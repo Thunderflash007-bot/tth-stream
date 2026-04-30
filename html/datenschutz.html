@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Datenschutzerklärung – TTH Stream</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d0f11;
+      --surface: #161b22;
+      --border:  #30363d;
+      --accent:  #58a6ff;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --radius:  8px;
+      --font:    'Segoe UI', system-ui, sans-serif;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    header .logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    main {
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-top: 32px;
+      margin-bottom: 8px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+    p { margin-top: 8px; color: var(--muted); }
+    ul { margin-top: 8px; margin-left: 20px; color: var(--muted); }
+    li { margin-top: 4px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 24px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .back-link:hover { color: var(--accent); }
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); margin: 0 6px; }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="/">⬡ TTH Stream</a>
+</header>
+
+<main>
+  <a class="back-link" href="/">← Zurück zum Stream</a>
+
+  <h1>Datenschutzerklärung</h1>
+  <p>Stand: April 2026 &nbsp;·&nbsp; Verantwortlicher: TTH Projects (Deutschland), Management: TCD-Studio/Agency</p>
+
+  <h2>1. Allgemeine Hinweise</h2>
+  <p>
+    Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. Diese Datenschutzerklärung informiert Sie darüber, welche Daten beim Besuch und der Nutzung von TTH Stream erhoben werden, zu welchem Zweck dies geschieht und welche Rechte Ihnen nach der DSGVO und dem BDSG zustehen.
+  </p>
+  <p>
+    Verantwortlicher im Sinne der DSGVO (§ 4 Nr. 7 DSGVO):<br>
+    TTH Projects &ndash; <strong><!-- DEIN NAME --></strong><br>
+    <!-- STRASSE &nbsp;·&nbsp; PLZ ORT &nbsp;·&nbsp; Deutschland --><br>
+    E-Mail: <a href="mailto:kontakt@tcd-studio.agency">kontakt@tcd-studio.agency</a>
+  </p>
+
+  <h2>2. Erhebung und Verarbeitung von Daten beim Seitenaufruf</h2>
+  <p>
+    Beim Aufruf dieser Website überträgt Ihr Browser automatisch folgende Daten an unseren Server:
+  </p>
+  <ul>
+    <li>IP-Adresse (anonymisiert oder kurzzeitig gespeichert)</li>
+    <li>Datum und Uhrzeit des Zugriffs</li>
+    <li>Aufgerufene URL</li>
+    <li>Browser-Typ und -Version</li>
+    <li>Betriebssystem</li>
+    <li>HTTP-Statuscode</li>
+  </ul>
+  <p>
+    Diese Daten werden ausschließlich zur Gewährleistung eines stabilen Betriebs und zur Fehlerbehebung verarbeitet (Art. 6 Abs. 1 lit. f DSGVO – berechtigtes Interesse). Eine Zusammenführung mit anderen Datenquellen findet nicht statt.
+  </p>
+
+  <h2>3. Live-Stream</h2>
+  <p>
+    Zum Abruf des Live-Streams wird eine Verbindung zu unserem Streaming-Server aufgebaut. Dabei wird Ihre IP-Adresse übertragen, die für die Auslieferung der Videodaten technisch notwendig ist. Es werden keine Zuschauer-Profile erstellt; Verbindungsdaten werden nicht dauerhaft gespeichert.
+  </p>
+
+  <h2>4. Live-Chat</h2>
+  <p>
+    Der Live-Chat nutzt eine Socket.io-Verbindung zu unserem Chat-Server. Dabei werden folgende Daten verarbeitet:
+  </p>
+  <ul>
+    <li>Selbst gewählter Nickname (kein Klarnamen-Zwang)</li>
+    <li>Nachrichten-Inhalt</li>
+    <li>Zeitstempel der Nachrichten</li>
+    <li>IP-Adresse (für die Verbindung, nicht dauerhaft gespeichert)</li>
+  </ul>
+  <p>
+    Chat-Nachrichten werden nur für die Dauer der aktiven Session im Arbeitsspeicher gehalten und nicht persistent gespeichert oder an Dritte weitergegeben. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO.
+  </p>
+
+  <h2>5. Keine Cookies, kein Tracking</h2>
+  <p>
+    Diese Website setzt keine Tracking-Cookies und verwendet kein serverseitiges oder clientseitiges Nutzer-Tracking (z. B. Google Analytics, Facebook Pixel o. Ä.).
+  </p>
+
+  <h2>6. Externe Inhalte und CDN</h2>
+  <p>
+    Für die Wiedergabe des Streams verwenden wir die Bibliothek <strong>hls.js</strong>, die über das CDN von jsDelivr (<a href="https://www.jsdelivr.com" target="_blank" rel="noopener">jsdelivr.com</a>) geladen wird. Dabei kann Ihre IP-Adresse an die Server von jsDelivr übertragen werden. Weitere Informationen finden Sie in der <a href="https://www.jsdelivr.com/privacy-policy-jsdelivr-net" target="_blank" rel="noopener">Datenschutzerklärung von jsDelivr</a>.
+  </p>
+
+  <h2>7. Ihre Rechte (DSGVO / BDSG)</h2>
+  <p>Sie haben das Recht auf:</p>
+  <ul>
+    <li><strong>Auskunft</strong> (Art. 15 DSGVO) über die über Sie gespeicherten Daten</li>
+    <li><strong>Berichtigung</strong> (Art. 16 DSGVO) unrichtiger Daten</li>
+    <li><strong>Löschung</strong> (Art. 17 DSGVO) Ihrer Daten, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen</li>
+    <li><strong>Einschränkung der Verarbeitung</strong> (Art. 18 DSGVO)</li>
+    <li><strong>Widerspruch gegen die Verarbeitung</strong> (Art. 21 DSGVO)</li>
+    <li><strong>Beschwerde</strong> bei der zuständigen Datenschutzbehörde</li>
+  </ul>
+  <p>
+    Zuständige Aufsichtsbehörde in Deutschland (Bundesebene):<br>
+    Bundesbeauftragter für den Datenschutz und die Informationsfreiheit (BfDI)<br>
+    Graurheinsdorfer Straße 153 &nbsp;·&nbsp; 53117 Bonn<br>
+    <a href="https://www.bfdi.bund.de" target="_blank" rel="noopener">https://www.bfdi.bund.de</a><br>
+    <em>Alternativ ist die Datenschutzbehörde des Bundeslandes zuständig, in dem du deinen Wohnsitz hast.</em>
+  </p>
+
+  <h2>8. Kontakt für Datenschutzanfragen</h2>
+  <p>
+    Für Fragen oder Anfragen zum Datenschutz wenden Sie sich bitte an:<br>
+    <a href="mailto:kontakt@tcd-studio.agency">kontakt@tcd-studio.agency</a>
+  </p>
+</main>
+
+<footer>
+  <a href="/">Startseite</a>
+  <a href="https://tcd-studio.agency/legal-notice-tth-projects/" target="_blank" rel="noopener">Impressum</a>
+  <a href="/datenschutz.html">Datenschutzerklärung</a>
+</footer>
+
+</body>
+</html>

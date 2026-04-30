@@ -332,6 +332,23 @@
       .main { flex-direction: column; }
       .chat-col { width: 100%; border-left: none; border-top: 1px solid var(--border); height: 40vh; }
     }
+
+    /* ── Footer ────────────────────────────────────────────────────────── */
+    .site-footer {
+      text-align: center;
+      padding: 8px 20px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .site-footer a {
+      color: var(--muted);
+      text-decoration: none;
+      margin: 0 6px;
+    }
+    .site-footer a:hover { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -393,6 +410,12 @@
 
   </div><!-- /.main -->
 </div><!-- /.wrapper -->
+
+<footer class="site-footer">
+  <a href="https://tcd-studio.agency/legal-notice-tth-projects/" target="_blank" rel="noopener">Impressum</a>
+  <span>·</span>
+  <a href="/datenschutz.html">Datenschutzerklärung</a>
+</footer>
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
