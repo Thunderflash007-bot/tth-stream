@@ -19,11 +19,17 @@
       }
       return 'http://' + window.location.hostname + ':4021';
     })();
+
+    window.__socketIoReady = new Promise((resolve, reject) => {
+      window.addEventListener('DOMContentLoaded', () => {
+        const script = document.getElementById('sio-script');
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Socket.io konnte nicht geladen werden.'));
+        script.src = _chatBase + '/socket.io/socket.io.js';
+      }, { once: true });
+    });
   </script>
   <script id="sio-script"></script>
-  <script>
-    document.getElementById('sio-script').src = _chatBase + '/socket.io/socket.io.js';
-  </script>
 
   <style>
     /* ── Reset & Basis ─────────────────────────────────────────────────── */
@@ -257,7 +263,75 @@
       padding: 3px 0;
     }
 
-    /* ── Nick-Setup ────────────────────────────────────────────────────── */
+    .auth-panel {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .auth-panel.hidden {
+      display: none;
+    }
+
+    .auth-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── Chat-Login ────────────────────────────────────────────────────── */
+    #auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #auth-form .auth-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    #auth-form input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    #auth-form input:focus { border-color: var(--accent); }
+
+    .ghost-btn {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .ghost-btn:hover {
+      opacity: 1;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .chat-userbar {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .chat-userbar.active {
+      display: flex;
+    }
+
     #nick-form {
       padding: 10px 12px;
       border-top: 1px solid var(--border);
@@ -395,11 +469,21 @@
 
       <div id="error-banner"></div>
 
-      <!-- Nickname-Eingabe (zuerst sichtbar) -->
-      <form id="nick-form">
-        <input id="nick-input" type="text" placeholder="Dein Nickname…" maxlength="24" autocomplete="off" required />
-        <button type="submit">Beitreten</button>
-      </form>
+      <div id="auth-panel" class="auth-panel">
+        <form id="auth-form">
+          <input id="auth-user-input" type="text" placeholder="Benutzername" maxlength="24" autocomplete="username" required />
+          <input id="auth-pass-input" type="password" placeholder="Passwort" minlength="4" autocomplete="current-password" required />
+          <div class="auth-row">
+            <button id="login-btn" type="submit">Einloggen</button>
+            <button id="register-btn" class="ghost-btn" type="button">Registrieren</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="chat-userbar" class="chat-userbar">
+        <span id="chat-user-label">Nicht eingeloggt</span>
+        <button id="logout-btn" class="ghost-btn" type="button">Logout</button>
+      </div>
 
       <!-- Chat-Eingabe (nach Nick sichtbar) -->
       <form id="chat-form">
@@ -575,15 +659,21 @@ startPlayer();
 /* ════════════════════════════════════════════════════════════════════════════
    CHAT (Socket.io)
 ════════════════════════════════════════════════════════════════════════════ */
-const socket        = io(_chatBase);
 const messagesDiv   = document.getElementById('chat-messages');
-const nickForm      = document.getElementById('nick-form');
-const nickInput     = document.getElementById('nick-input');
+const authPanel     = document.getElementById('auth-panel');
+const authForm      = document.getElementById('auth-form');
+const authUserInput = document.getElementById('auth-user-input');
+const authPassInput = document.getElementById('auth-pass-input');
+const registerBtn   = document.getElementById('register-btn');
 const chatForm      = document.getElementById('chat-form');
 const msgInput      = document.getElementById('msg-input');
 const errorBanner   = document.getElementById('error-banner');
 const viewerCount   = document.getElementById('viewer-count');
+const chatUserbar   = document.getElementById('chat-userbar');
+const chatUserLabel = document.getElementById('chat-user-label');
+const logoutBtn     = document.getElementById('logout-btn');
 
+let socket = null;
 let myNick = null;
 
 function showError(msg) {
@@ -617,38 +707,94 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ── Socket-Events ────────────────────────────────────────────────────────
-socket.on('nick_ok', (nick) => {
-  myNick = nick;
-  nickForm.style.display  = 'none';
+function applyAuthState(username) {
+  myNick = username;
+  authPanel.classList.add('hidden');
+  chatUserbar.classList.add('active');
+  chatUserLabel.textContent = `Angemeldet als ${username}`;
   chatForm.classList.add('active');
   msgInput.focus();
-});
+}
 
-socket.on('chat_msg',   appendMsg);
-socket.on('system_msg', appendSys);
+function clearAuthState() {
+  myNick = null;
+  authPanel.classList.remove('hidden');
+  chatUserbar.classList.remove('active');
+  chatUserLabel.textContent = 'Nicht eingeloggt';
+  chatForm.classList.remove('active');
+}
 
-socket.on('error_msg', showError);
+async function initChat() {
+  try {
+    await window.__socketIoReady;
+  } catch (_err) {
+    showError('Chat konnte nicht geladen werden.');
+    return;
+  }
 
-socket.on('user_count', (n) => {
-  viewerCount.textContent = `${n} Zuschauer`;
-});
+  socket = io(_chatBase, {
+    transports: ['websocket', 'polling']
+  });
+
+  socket.on('auth_ok', ({ username }) => {
+    applyAuthState(username);
+    authPassInput.value = '';
+  });
+
+  socket.on('chat_msg', appendMsg);
+  socket.on('system_msg', appendSys);
+  socket.on('error_msg', showError);
+  socket.on('user_count', (n) => {
+    viewerCount.textContent = `${n} Zuschauer`;
+  });
+  socket.on('connect_error', () => {
+    showError('Chat-Server ist momentan nicht erreichbar.');
+  });
+}
 
 // ── Formulare ────────────────────────────────────────────────────────────
-nickForm.addEventListener('submit', (e) => {
+authForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const nick = nickInput.value.trim();
-  if (nick) socket.emit('set_nick', nick);
+  if (!socket) return;
+
+  const username = authUserInput.value.trim();
+  const password = authPassInput.value;
+  if (username && password) {
+    socket.emit('auth_login', { username, password });
+  }
+});
+
+registerBtn.addEventListener('click', () => {
+  if (!socket) return;
+
+  const username = authUserInput.value.trim();
+  const password = authPassInput.value;
+  if (username && password) {
+    socket.emit('auth_register', { username, password });
+  } else {
+    showError('Bitte Benutzername und Passwort eingeben.');
+  }
+});
+
+logoutBtn.addEventListener('click', () => {
+  if (socket) {
+    socket.emit('auth_logout');
+  }
+  clearAuthState();
 });
 
 chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!socket) return;
   const msg = msgInput.value.trim();
   if (msg) {
     socket.emit('chat_msg', msg);
     msgInput.value = '';
   }
 });
+
+clearAuthState();
+initChat();
 </script>
 
 </body>
